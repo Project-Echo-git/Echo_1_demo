@@ -1,3 +1,4 @@
+import cv2
 import os
 from pathlib import Path
 
@@ -20,6 +21,50 @@ class ObjectDetector:
         if self.result.boxes is None:
             return []
         return sorted({self.result.names[int(i)] for i in self.result.boxes.cls.tolist()})
+
+
+    def run(self, source="percipio", camera_index=0, on_objects=None):
+        camera = open_camera(source, camera_index)
+        previous_names = []
+        names = []
+        try:
+            while True:
+                ok, frame = camera.read()
+                if not ok:
+                    raise RuntimeError("Cannot read camera.")
+                names = self.detect(frame)
+                if on_objects is not None:
+                    on_objects(names)
+                elif names != previous_names:
+                    print(", ".join(names), flush=True)
+                previous_names = names
+                cv2.imshow("Objects - Q to quit", self.result.plot())
+                if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                    break
+                if cv2.getWindowProperty("Objects - Q to quit", cv2.WND_PROP_VISIBLE) < 1:
+                    break
+        finally:
+            try:
+                camera.release()
+            finally:
+                cv2.destroyAllWindows()
+        return names
+
+
+
+def open_camera(source, camera_index=0):
+    if source == "percipio":
+        from percipio_rgb import PercipioCamera
+
+        return PercipioCamera()
+    if source == "webcam":
+        camera = cv2.VideoCapture(camera_index)
+        if not camera.isOpened():
+            camera.release()
+            raise RuntimeError(f"Cannot open webcam {camera_index}.")
+        return camera
+    raise ValueError(f"Unknown camera source: {source}")
+
 
 
 def main():

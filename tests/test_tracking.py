@@ -6,7 +6,8 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 import launch
-import classes as tracking
+import face_tracker as tracking
+import person_tracker
 from center_pixel_PID import TargetController
 from face_tracker import FaceTracker
 from person_tracker import PersonTracker
@@ -74,11 +75,13 @@ class TrackingTests(unittest.TestCase):
         stack.enter_context(patch.object(tracking.cv2, "getWindowProperty", return_value=1))
         return stack.enter_context(patch.object(tracking.cv2, "destroyAllWindows"))
 
-    def test_both_detectors_use_same_loop_and_loss_callback(self):
+    def test_each_tracker_loop_and_loss_callback(self):
         for name, aim, expected in (
             ("face", (0.47, 0.3), (18, 0)),
             ("person", (0.5, 0.25), (20, 10)),
         ):
+            global tracking
+            tracking = __import__("face_tracker" if name == "face" else "person_tracker")
             with self.subTest(detector=name), ExitStack() as stack:
                 camera = Mock()
                 camera.read.return_value = (True, np.zeros((480, 640, 3), dtype=np.uint8))
@@ -99,6 +102,8 @@ class TrackingTests(unittest.TestCase):
                 cleanup.assert_called_once()
 
     def test_cleanup_after_read_detector_or_callback_failure(self):
+        global tracking
+        tracking = __import__("face_tracker")
         for failure in ("read", "detect", "callback"):
             with self.subTest(failure=failure), ExitStack() as stack:
                 camera = Mock()
@@ -147,9 +152,10 @@ class ConnectionAndLaunchTests(unittest.TestCase):
                                   ("person", "person_tracker", "PersonTracker")):
             with self.subTest(detector=name), patch(f"{module}.{cls}") as detector, \
                     patch.object(PICOS["neck"], "open") as pico, \
-                    patch("classes.run_tracking") as loop:
+                    patch(f"{module}.run_tracking") as loop:
                 args = launch.parse_args(["--detector", name, "--source", "webcam",
                                           "--camera", "2", "--dry-run"])
+                detector.return_value.run.side_effect = lambda **kwargs: loop(detector.return_value, **kwargs)
                 launch.run(args)
                 pico.assert_not_called()
                 self.assertIs(loop.call_args.args[0], detector.return_value)
@@ -158,8 +164,8 @@ class ConnectionAndLaunchTests(unittest.TestCase):
                 self.assertIsNone(loop.call_args.kwargs["on_target"].__self__.pico)
 
     def test_launcher_closes_serial_when_tracking_fails(self):
-        with patch("face_tracker.FaceTracker"), patch("serial.Serial") as serial, \
-                patch("classes.run_tracking", side_effect=RuntimeError("camera failed")):
+        with patch("face_tracker.FaceTracker") as tracker, patch("serial.Serial") as serial:
+            tracker.return_value.run.side_effect = RuntimeError("camera failed")
             with self.assertRaisesRegex(RuntimeError, "camera failed"):
                 launch.run(launch.parse_args(["--port", "COM4"]))
             serial.return_value.write.assert_called_once_with(b"90.00,90.00\n")

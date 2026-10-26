@@ -30,13 +30,15 @@ class SkillTests(unittest.TestCase):
 
     def test_object_skill_returns_and_forwards_names_without_serial(self):
         with ExitStack() as stack:
-            model = stack.enter_context(patch("object_detection.ObjectDetector"))
-            model.return_value.detect.return_value = ["cup"]
-            camera = stack.enter_context(patch("classes.open_camera"))
+            model = stack.enter_context(patch("object_detection.ObjectDetector.detect"))
+            stack.enter_context(patch("object_detection.ObjectDetector.__init__", return_value=None))
+            stack.enter_context(patch.object(ObjectDetector, "result", Mock(), create=True))
+            model.return_value = ["cup"]
+            camera = stack.enter_context(patch("object_detection.open_camera"))
             camera.return_value.read.return_value = (True, object())
-            stack.enter_context(patch("classes.cv2.imshow"))
-            stack.enter_context(patch("classes.cv2.waitKey", return_value=ord("q")))
-            cleanup = stack.enter_context(patch("classes.cv2.destroyAllWindows"))
+            stack.enter_context(patch("object_detection.cv2.imshow"))
+            stack.enter_context(patch("object_detection.cv2.waitKey", return_value=ord("q")))
+            cleanup = stack.enter_context(patch("object_detection.cv2.destroyAllWindows"))
             serial = stack.enter_context(patch("serial.Serial"))
             callback = Mock()
             self.assertEqual(classes.Robot().object_detection(callback), ["cup"])
@@ -46,9 +48,9 @@ class SkillTests(unittest.TestCase):
             cleanup.assert_called_once()
 
     def test_object_skill_cleans_up_on_failure(self):
-        with patch("object_detection.ObjectDetector") as model, patch("classes.open_camera") as camera, patch("classes.cv2.destroyAllWindows") as cleanup:
+        with patch("object_detection.ObjectDetector.__init__", return_value=None), patch("object_detection.ObjectDetector.detect") as model, patch("object_detection.open_camera") as camera, patch("object_detection.cv2.destroyAllWindows") as cleanup:
             camera.return_value.read.return_value = (True, object())
-            model.return_value.detect.side_effect = RuntimeError("failed")
+            model.side_effect = RuntimeError("failed")
             with self.assertRaises(RuntimeError):
                 classes.Robot().object_detection()
             camera.return_value.release.assert_called_once()
@@ -61,7 +63,7 @@ class SkillTests(unittest.TestCase):
 
     def test_neck_gestures_use_two_angles_and_close(self):
         for method, axis in (("non_verbal_no", 0), ("non_verbal_yes", 1)):
-            with self.subTest(method=method), patch("serial.Serial") as serial, patch("classes.time.sleep"):
+            with self.subTest(method=method), patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"):
                 robot = classes.Robot(port="COM4")
                 getattr(robot, method)()
                 commands = [tuple(map(float, call.args[0].decode().strip().split(","))) for call in serial.return_value.write.call_args_list]
@@ -69,6 +71,22 @@ class SkillTests(unittest.TestCase):
                 self.assertEqual(commands[-1], (90, 90))
                 self.assertTrue(all(60 <= angle <= 120 for command in commands for angle in command))
                 serial.return_value.close.assert_called_once()
+
+
+    def test_neck_gesture_dry_run_does_not_open_serial(self):
+        with patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"), patch("builtins.print") as output:
+            robot = classes.Robot(dry_run=True)
+            robot.non_verbal_yes()
+            robot.non_verbal_no()
+            serial.assert_not_called()
+            self.assertEqual(output.call_args.args, ((90, 90),))
+
+    def test_neck_gesture_closes_connection_after_send_failure(self):
+        with patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"):
+            serial.return_value.write.side_effect = RuntimeError("send failed")
+            with self.assertRaisesRegex(RuntimeError, "send failed"):
+                classes.Robot(port="COM4").non_verbal_yes()
+            serial.return_value.close.assert_called_once()
 
 
 if __name__ == "__main__":
