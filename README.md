@@ -11,12 +11,10 @@ Works with the Percipio camera or a webcam.
 - `face_target.py` - picks a target and smooths its position.
 - `Communicate_pico.py` - PID control and sends servo angles to the Pico.
 - `percipio_camera.py` - connects to the Percipio camera. Camera IP and serial number are set here.
-- `pico/pico_receiver.py` - receives angles on the Pico. Copy it to the Pico as `code.py`. Pan: GP28, tilt: GP19. Needs CircuitPython and `adafruit_motor`.
+- `pico/pico_receiver.py` - receives angles on the Pico ( this is the main pico file in code.py)
 - `pico/pico_raw_angles.py` - basic servo movement test.
 - `models/yolo26n.pt` - YOLO model.
-- `.vscode/` - editor settings, including old C++ build tasks.
-- `.yolo/` - YOLO settings.
-- `.gitignore` - files Git should ignore.
+
 
 `.venv/` holds Python packages. `build/` and `deps/` are left over from the C++ camera test. CMake is not needed for Python tracking.
 
