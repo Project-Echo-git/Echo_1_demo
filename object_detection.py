@@ -70,7 +70,7 @@ def open_camera(source, camera_index=0):
 def main():
     from classes import Robot
 
-    return Robot().object_detection()
+    return Robot().detect_objects()
 
 
 if __name__ == "__main__":

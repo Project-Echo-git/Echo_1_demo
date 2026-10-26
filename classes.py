@@ -76,16 +76,16 @@ class Robot:
             tracker.run(source=self.source, camera_index=self.camera_index,
                          on_target=controller.update)
 
-    def object_detection(self, on_objects=None):
+    def detect_objects(self, on_objects=None):
         from object_detection import ObjectDetector
 
         return ObjectDetector().run(source=self.source, camera_index=self.camera_index,
                                     on_objects=on_objects)
 
-    def non_verbal_no(self):
+    def shake_no(self):
         return neck_gesture(None if self.dry_run else self.picos["neck"], 0)
 
-    def non_verbal_yes(self):
+    def nod_yes(self):
         return neck_gesture(None if self.dry_run else self.picos["neck"], 1)
 
     def wave_left(self):

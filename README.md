@@ -8,9 +8,9 @@ The robot's capabilities are built from separate modules. Start by choosing a sk
 | --- | --- | --- |
 | Follow a face | `robot.track_face()` | Uses face position to steer the neck. |
 | Follow a person | `robot.track_person()` | Uses person position to steer the neck. |
-| Recognise objects | `robot.object_detection()` | Reports detected object names and can pass them to another skill. |
-| Nod yes | `robot.non_verbal_yes()` | Moves the neck's pitch servo through a nod. |
-| Shake no | `robot.non_verbal_no()` | Moves the neck's yaw servo from side to side. |
+| Recognise objects | `robot.detect_objects()` | Reports detected object names and can pass them to another skill. |
+| Nod yes | `robot.nod_yes()` | Moves the neck's pitch servo through a nod. |
+| Shake no | `robot.shake_no()` | Moves the neck's yaw servo from side to side. |
 
 
 ```python
@@ -25,7 +25,7 @@ Camera skills run until Q or Escape is pressed or the preview window is closed. 
 Object detection can pass each frame's names to another function:
 
 ```python
-robot.object_detection(on_objects=print)
+robot.detect_objects(on_objects=print)
 ```
 
 It also returns the final frame's names when the preview closes. To use recognition without a preview loop, call the model directly:
@@ -48,17 +48,17 @@ The arm and hand definitions are retained as configuration work in progress. The
 
 ### Run a skill
 
-Run these commands with the project's Python environment:
+Run one command from the project folder. The skill name is the only input, and it matches the method on `Robot`:
 
 ```text
-python launch.py
-python launch.py --skill person
-python launch.py --skill objects
-python launch.py --skill face --source webcam --camera 0 --dry-run
-python launch.py --skill face --port COM4
+python launch.py track_face
+python launch.py track_person
+python launch.py detect_objects
+python launch.py nod_yes
+python launch.py shake_no
 ```
 
-The default skill is face tracking with the Percipio camera. `--detector face` and `--detector person` remain accepted as aliases for `--skill`. `--dry-run` previews tracking without opening a Pico connection. `--debug-timing` prints the controller update rate.
+`python launch.py --help` lists the available skills. Set camera and Pico configuration in `classes.py`; the launcher uses `Robot()` with those defaults. It automatically uses the project's Python environment.
 
 ## Build a new skill
 
@@ -67,7 +67,7 @@ A skill is a method on `Robot` in `classes.py`. It combines existing modules int
 1. Decide what the robot should do and what output the skill should provide.
 2. Choose its inputs and models. Add a controller and Pico connection when it needs movement.
 3. Add a method to `Robot` that connects those modules. Keep detection and tracking calculations in the model files; keep angle calculations in the controller.
-4. Call the method directly, or add its name to the `--skill` choices and the `skills` dictionary in `launch.py`.
+4. Call the method directly, or add its method name to `SKILLS` in `launch.py`. The command will use that same name.
 
 For example, a new skill can recognise objects from one RGB frame and return their names. Add this method inside `Robot`:
 

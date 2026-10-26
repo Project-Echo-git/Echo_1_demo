@@ -12,7 +12,7 @@ from center_pixel_PID import TargetController
 from face_tracker import FaceTracker
 from person_tracker import PersonTracker
 from send_to_pico import Pico, send_angles
-from classes import PICOS
+from classes import PICOS, Robot
 from face_tracker import StableTarget
 
 
@@ -153,10 +153,8 @@ class ConnectionAndLaunchTests(unittest.TestCase):
             with self.subTest(detector=name), patch(f"{module}.{cls}") as detector, \
                     patch.object(PICOS["neck"], "open") as pico, \
                     patch(f"{module}.run_tracking") as loop:
-                args = launch.parse_args(["--detector", name, "--source", "webcam",
-                                          "--camera", "2", "--dry-run"])
                 detector.return_value.run.side_effect = lambda **kwargs: loop(detector.return_value, **kwargs)
-                launch.run(args)
+                getattr(Robot(source="webcam", camera_index=2, dry_run=True), "track_" + name)()
                 pico.assert_not_called()
                 self.assertIs(loop.call_args.args[0], detector.return_value)
                 self.assertEqual(loop.call_args.kwargs["source"], "webcam")
@@ -167,7 +165,7 @@ class ConnectionAndLaunchTests(unittest.TestCase):
         with patch("face_tracker.FaceTracker") as tracker, patch("serial.Serial") as serial:
             tracker.return_value.run.side_effect = RuntimeError("camera failed")
             with self.assertRaisesRegex(RuntimeError, "camera failed"):
-                launch.run(launch.parse_args(["--port", "COM4"]))
+                Robot(port="COM4").track_face()
             serial.return_value.write.assert_called_once_with(b"90.00,90.00\n")
             serial.return_value.close.assert_called_once()
 

@@ -11,11 +11,11 @@ from object_detection import ObjectDetector
 
 class SkillTests(unittest.TestCase):
     def test_launch_selects_each_robot_skill(self):
-        for skill, method in (("face", "track_face"), ("person", "track_person"), ("objects", "object_detection")):
+        for skill in launch.SKILLS:
             with self.subTest(skill=skill), patch("classes.Robot") as robot:
-                launch.run(launch.parse_args(["--skill", skill, "--source", "webcam", "--dry-run"]))
-                getattr(robot.return_value, method).assert_called_once_with()
-                self.assertTrue(robot.call_args.kwargs["dry_run"])
+                launch.run(launch.parse_args([skill]).skill)
+                robot.assert_called_once_with()
+                getattr(robot.return_value, skill).assert_called_once_with()
 
     def test_object_model_returns_unique_names(self):
         detector = ObjectDetector.__new__(ObjectDetector)
@@ -41,7 +41,7 @@ class SkillTests(unittest.TestCase):
             cleanup = stack.enter_context(patch("object_detection.cv2.destroyAllWindows"))
             serial = stack.enter_context(patch("serial.Serial"))
             callback = Mock()
-            self.assertEqual(classes.Robot().object_detection(callback), ["cup"])
+            self.assertEqual(classes.Robot().detect_objects(callback), ["cup"])
             callback.assert_called_once_with(["cup"])
             serial.assert_not_called()
             camera.return_value.release.assert_called_once()
@@ -52,7 +52,7 @@ class SkillTests(unittest.TestCase):
             camera.return_value.read.return_value = (True, object())
             model.side_effect = RuntimeError("failed")
             with self.assertRaises(RuntimeError):
-                classes.Robot().object_detection()
+                classes.Robot().detect_objects()
             camera.return_value.release.assert_called_once()
             cleanup.assert_called_once()
 
@@ -62,7 +62,7 @@ class SkillTests(unittest.TestCase):
         pico.send_angles.assert_called_once_with(*angles)
 
     def test_neck_gestures_use_two_angles_and_close(self):
-        for method, axis in (("non_verbal_no", 0), ("non_verbal_yes", 1)):
+        for method, axis in (("shake_no", 0), ("nod_yes", 1)):
             with self.subTest(method=method), patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"):
                 robot = classes.Robot(port="COM4")
                 getattr(robot, method)()
@@ -76,8 +76,8 @@ class SkillTests(unittest.TestCase):
     def test_neck_gesture_dry_run_does_not_open_serial(self):
         with patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"), patch("builtins.print") as output:
             robot = classes.Robot(dry_run=True)
-            robot.non_verbal_yes()
-            robot.non_verbal_no()
+            robot.nod_yes()
+            robot.shake_no()
             serial.assert_not_called()
             self.assertEqual(output.call_args.args, ((90, 90),))
 
@@ -85,7 +85,7 @@ class SkillTests(unittest.TestCase):
         with patch("serial.Serial") as serial, patch("neck_gestures.time.sleep"):
             serial.return_value.write.side_effect = RuntimeError("send failed")
             with self.assertRaisesRegex(RuntimeError, "send failed"):
-                classes.Robot(port="COM4").non_verbal_yes()
+                classes.Robot(port="COM4").nod_yes()
             serial.return_value.close.assert_called_once()
 
 

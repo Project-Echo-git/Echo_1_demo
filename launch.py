@@ -4,29 +4,19 @@ import subprocess
 import sys
 
 
+SKILLS = ("track_face", "track_person", "detect_objects", "nod_yes", "shake_no")
+
+
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Run a robot capability.")
-    parser.add_argument("--skill", "--detector", dest="skill",
-                        choices=("face", "person", "objects"), default="face")
-    parser.add_argument("--source", choices=("percipio", "webcam"), default="percipio")
-    parser.add_argument("--camera", type=int, default=0, help="Webcam index")
-    parser.add_argument("--port", help="Pico serial port (auto-detected if omitted)")
-    parser.add_argument("--dry-run", action="store_true", help="Preview without moving servos")
-    parser.add_argument("--debug-timing", action="store_true", help="Print controller update rate")
+    parser = argparse.ArgumentParser(description="Run a robot skill.")
+    parser.add_argument("skill", choices=SKILLS)
     return parser.parse_args(argv)
 
 
-def run(args):
+def run(skill):
     from classes import Robot
 
-    robot = Robot(source=args.source, camera_index=args.camera, port=args.port,
-                  dry_run=args.dry_run, debug_timing=args.debug_timing)
-    skills = {
-        "face": robot.track_face,
-        "person": robot.track_person,
-        "objects": robot.object_detection,
-    }
-    return skills[args.skill]()
+    return getattr(Robot(), skill)()
 
 
 def main():
@@ -40,7 +30,7 @@ def main():
         if Path(sys.executable).resolve() != python.resolve():
             return subprocess.call([str(python), str(Path(__file__).resolve()), *sys.argv[1:]],
                                    cwd=project_dir)
-        run(args)
+        run(args.skill)
         return 0
     except KeyboardInterrupt:
         return 130
