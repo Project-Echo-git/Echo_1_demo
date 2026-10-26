@@ -1,3 +1,5 @@
+import time
+from collections import Counter, deque
 import cv2
 import os
 from pathlib import Path
@@ -5,6 +7,9 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_PATH = PROJECT_DIR / "models" / "yolo26n.pt"
 CONFIDENCE = 0.5
+DETECTION_FRAMES = 40
+MIN_DETECTIONS = 25
+DETECTION_TIMEOUT = 20.0
 
 
 class ObjectDetector:
@@ -25,31 +30,42 @@ class ObjectDetector:
 
     def run(self, source="percipio", camera_index=0, on_objects=None):
         camera = open_camera(source, camera_index)
-        previous_names = []
-        names = []
+        readings = deque()
+        counts = Counter()
+        started = None
         try:
             while True:
                 ok, frame = camera.read()
                 if not ok:
                     raise RuntimeError("Cannot read camera.")
-                names = self.detect(frame)
-                if on_objects is not None:
-                    on_objects(names)
-                elif names != previous_names:
-                    print(", ".join(names), flush=True)
-                previous_names = names
+                names = set(self.detect(frame))
+                now = time.monotonic()
+                if started is None:
+                    started = now
+                if len(readings) == DETECTION_FRAMES:
+                    counts.subtract(readings.popleft())
+                readings.append(names)
+                counts.update(names)
                 cv2.imshow("Objects - Q to quit", self.result.plot())
                 if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
-                    break
+                    return None
                 if cv2.getWindowProperty("Objects - Q to quit", cv2.WND_PROP_VISIBLE) < 1:
-                    break
+                    return None
+                if len(readings) == DETECTION_FRAMES and counts:
+                    name, sightings = counts.most_common(1)[0]
+                    if sightings >= MIN_DETECTIONS:
+                        print(f"the detected object is: {name}", flush=True)
+                        if on_objects is not None:
+                            on_objects(name)
+                        return name
+                if now - started >= DETECTION_TIMEOUT:
+                    print("the detected object is: none", flush=True)
+                    return None
         finally:
             try:
                 camera.release()
             finally:
                 cv2.destroyAllWindows()
-        return names
-
 
 
 def open_camera(source, camera_index=0):

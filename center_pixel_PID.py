@@ -12,8 +12,8 @@ DEAD_ZONE_PX = 3
 MAX_SPEED = 90.0
 
 D_ALPHA = 0.25
-PID_X = (0.27, 0.0, 0.145)
-PID_Y = (0.27, 0.0, 0.145)
+PID_X = (0.235, 0.12, 0.055)
+PID_Y = (0.235, 0.12, 0.055)
 
 
 def clamp(value, low, high):

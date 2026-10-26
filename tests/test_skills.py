@@ -28,22 +28,56 @@ class SkillTests(unittest.TestCase):
         detector.model.return_value = [SimpleNamespace(boxes=None)]
         self.assertEqual(detector.detect(None), [])
 
-    def test_object_skill_returns_and_forwards_names_without_serial(self):
+    def test_object_skill_selects_consistent_name_and_closes(self):
+        cases = (
+            ([["cup", "bottle"]] * 25 + [["cup"]] * 25, "cup"),
+            ([["cup"]] * 24 + [["bottle"]] * 26, "bottle"),
+            ([[]] * 50 + [["cup"]] * 25, "cup"),
+            ([["cup"] * 25] + [[]] * 49, None),
+            ([[]] * 50, None),
+        )
+        for frames, expected in cases:
+            with self.subTest(frames=frames), ExitStack() as stack:
+                model = stack.enter_context(patch("object_detection.ObjectDetector.detect", side_effect=frames))
+                stack.enter_context(patch("object_detection.ObjectDetector.__init__", return_value=None))
+                stack.enter_context(patch.object(ObjectDetector, "result", Mock(), create=True))
+                camera = stack.enter_context(patch("object_detection.open_camera"))
+                camera.return_value.read.return_value = (True, object())
+                stack.enter_context(patch("object_detection.cv2.imshow"))
+                stack.enter_context(patch("object_detection.cv2.waitKey", return_value=-1))
+                stack.enter_context(patch("object_detection.cv2.getWindowProperty", return_value=1))
+                times = [i * 0.1 for i in range(len(frames))]
+                if expected is None:
+                    times[-1] = 30.0
+                stack.enter_context(patch("object_detection.time.monotonic", side_effect=times))
+                cleanup = stack.enter_context(patch("object_detection.cv2.destroyAllWindows"))
+                serial = stack.enter_context(patch("serial.Serial"))
+                output = stack.enter_context(patch("builtins.print"))
+                callback = Mock()
+                self.assertEqual(classes.Robot().detect_objects(callback), expected)
+                self.assertEqual(model.call_count, len(frames))
+                output.assert_called_once_with(f"the detected object is: {expected if expected is not None else 'none'}", flush=True)
+                if expected is None:
+                    callback.assert_not_called()
+                else:
+                    callback.assert_called_once_with(expected)
+                serial.assert_not_called()
+                camera.return_value.release.assert_called_once()
+                cleanup.assert_called_once()
+
+    def test_object_cancellation_does_not_print_none(self):
         with ExitStack() as stack:
-            model = stack.enter_context(patch("object_detection.ObjectDetector.detect"))
             stack.enter_context(patch("object_detection.ObjectDetector.__init__", return_value=None))
+            stack.enter_context(patch("object_detection.ObjectDetector.detect", return_value=[]))
             stack.enter_context(patch.object(ObjectDetector, "result", Mock(), create=True))
-            model.return_value = ["cup"]
             camera = stack.enter_context(patch("object_detection.open_camera"))
             camera.return_value.read.return_value = (True, object())
             stack.enter_context(patch("object_detection.cv2.imshow"))
             stack.enter_context(patch("object_detection.cv2.waitKey", return_value=ord("q")))
             cleanup = stack.enter_context(patch("object_detection.cv2.destroyAllWindows"))
-            serial = stack.enter_context(patch("serial.Serial"))
-            callback = Mock()
-            self.assertEqual(classes.Robot().detect_objects(callback), ["cup"])
-            callback.assert_called_once_with(["cup"])
-            serial.assert_not_called()
+            output = stack.enter_context(patch("builtins.print"))
+            self.assertIsNone(classes.Robot().detect_objects())
+            output.assert_not_called()
             camera.return_value.release.assert_called_once()
             cleanup.assert_called_once()
 

@@ -8,7 +8,7 @@ The robot's capabilities are built from separate modules. Start by choosing a sk
 | --- | --- | --- |
 | Follow a face | `robot.track_face()` | Uses face position to steer the neck. |
 | Follow a person | `robot.track_person()` | Uses person position to steer the neck. |
-| Recognise objects | `robot.detect_objects()` | Reports detected object names and can pass them to another skill. |
+| Recognise objects | `robot.detect_objects()` | Reports a consistent object, waiting up to 30 seconds when nothing is confirmed. |
 | Nod yes | `robot.nod_yes()` | Moves the neck's pitch servo through a nod. |
 | Shake no | `robot.shake_no()` | Moves the neck's yaw servo from side to side. |
 
@@ -20,15 +20,17 @@ robot = Robot(source="percipio", port="COM4")
 robot.track_face()
 ```
 
-Camera skills run until Q or Escape is pressed or the preview window is closed. They release the camera and close their serial connection on exit.
+Face and person tracking run until Q or Escape is pressed or the preview window is closed. Object recognition finishes when an object is confirmed, or after a 30-second timeout. Camera skills release the camera and close their serial connection on exit.
 
-Object detection can pass each frame's names to another function:
+Object recognition keeps checking the latest 50 frames and requires at least 25 sightings of an object. Each object gets one vote per frame. The most frequent qualifying name is printed once as `the detected object is: cup` and returned. If nothing is confirmed, it keeps looking and only prints `the detected object is: none` after 30 seconds. The timeout starts after the first detection finishes, excluding model startup. Q, Escape, or closing the preview cancels without printing `none`. Set `DETECTION_FRAMES`, `MIN_DETECTIONS`, and `DETECTION_TIMEOUT` in `object_detection.py` to adjust this.
+
+The selected name can also be passed to another function:
 
 ```python
 robot.detect_objects(on_objects=print)
 ```
 
-It also returns the final frame's names when the preview closes. To use recognition without a preview loop, call the model directly:
+The callback receives one confirmed name when recognition finishes. To get raw per-frame detections, call the model directly:
 
 ```python
 from object_detection import ObjectDetector
