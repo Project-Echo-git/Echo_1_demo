@@ -21,8 +21,6 @@ def main():
 
     try:
         from Communicate_pico import main as run_tracking
-        #from face_recognition import main as track_target
-        from person import main as track_target
         run_tracking(track_face=track_target)
         return 0
     except KeyboardInterrupt:
