@@ -3,40 +3,43 @@
   "configurations": [
     {
       "request": "launch",
+      "type": "debugpy",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "name": "Percipio face tracking + Pico",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
-      "type": "debugpy",
+      "program": "${workspaceFolder}/launch.py",
+      "name": "Face tracking + Pico",
       "args": [
-        "--source",
-        "percipio"
-      ],
-      "program": "${workspaceFolder}/launch.py"
+        "--detector",
+        "face"
+      ]
     },
     {
       "request": "launch",
+      "type": "debugpy",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "name": "Percipio face tracking (preview only)",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "program": "${workspaceFolder}/launch.py",
+      "name": "Person tracking + Pico",
+      "args": [
+        "--detector",
+        "person"
+      ]
+    },
+    {
+      "request": "launch",
       "type": "debugpy",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "program": "${workspaceFolder}/launch.py",
+      "name": "Webcam preview",
       "args": [
         "--source",
-        "percipio",
+        "webcam",
         "--dry-run"
-      ],
-      "program": "${workspaceFolder}/launch.py"
-    },
-    {
-      "request": "launch",
-      "preLaunchTask": "Build Percipio RGB",
-      "name": "Run Percipio RGB",
-      "console": "integratedTerminal",
-      "type": "cppvsdbg",
-      "cwd": "${workspaceFolder}\\build\\Release",
-      "program": "${workspaceFolder}\\build\\Release\\percipio_test.exe",
-      "stopAtEntry": false
+      ]
     }
   ]
 }

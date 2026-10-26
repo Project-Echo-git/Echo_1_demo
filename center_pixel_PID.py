@@ -1,8 +1,5 @@
-import argparse
 import time
 
-PORT = None
-BAUD_RATE = 115200
 START_ANGLE_X = 90.0
 START_ANGLE_Y = 90.0
 ANGLE_LIMITS_X = (60.0, 120.0)
@@ -15,8 +12,8 @@ DEAD_ZONE_PX = 3
 MAX_SPEED = 90.0
 
 D_ALPHA = 0.25
-PID_X = (0.27, 0.0, 0.145)
-PID_Y = (0.27, 0.0, 0.145)
+PID_X = (0.235, 0.12, 0.055)
+PID_Y = (0.235, 0.12, 0.055)
 
 
 def clamp(value, low, high):
@@ -51,7 +48,7 @@ class PID:
         return speed
 
 
-class FaceController:
+class TargetController:
     def __init__(self, pico=None, debug_timing=False):
         self.pico = pico
         self.pid_x = PID(*PID_X)
@@ -65,7 +62,6 @@ class FaceController:
         self._timing_intervals = []
 
     def _report_timing(self):
-        # Independent clock/state: includes target-loss calls, never clamps dt.
         now = time.perf_counter()
         if self._timing_previous is None:
             self._timing_previous = self._timing_started = now
@@ -82,7 +78,7 @@ class FaceController:
             self._timing_intervals = []
             self._timing_started = now
 
-    def update(self, error_x, error_y, frame_width, frame_height):
+    def update(self, error_x, error_y):
         if self.debug_timing:
             self._report_timing()
         if error_x is None or error_y is None:
@@ -99,15 +95,12 @@ class FaceController:
         dt = clamp(dt, 0.001, 0.1)
         self.previous_time = now
 
-        # Head-mounted camera: image error requests angular velocity (deg/s).
-        # Integrate from the current angle; centred faces hold that angle.
         speed_x = DIRECTION_X * self.pid_x.update(error_x, dt)
         speed_y = DIRECTION_Y * self.pid_y.update(error_y, dt)
         next_x = self.angle_x + speed_x * dt
         next_y = self.angle_y + speed_y * dt
         self.angle_x = clamp(next_x, *ANGLE_LIMITS_X)
         self.angle_y = clamp(next_y, *ANGLE_LIMITS_Y)
-        # Avoid integral windup when either servo reaches its travel limit.
         if self.angle_x != next_x:
             self.pid_x.integral = 0.0
         if self.angle_y != next_y:
@@ -115,48 +108,7 @@ class FaceController:
 
         command = f"{self.angle_x:.2f},{self.angle_y:.2f}\n"
         if self.pico is not None:
-            self.pico.write(command.encode("ascii"))
+            self.pico.send_angles(self.angle_x, self.angle_y)
         else:
             print(f"error=({error_x}, {error_y}) px -> angles={command.strip()}")
-
-
-def find_pico_port():
-    from serial.tools import list_ports
-
-    candidates = [p.device for p in list_ports.comports() if p.vid in (0x2E8A, 0x239A)]
-    if len(candidates) != 1:
-        raise RuntimeError("Set PORT or pass --port with your Pico's USB serial port.")
-    return candidates[0]
-
-
-def main(track_face=None):
-    if track_face is None:
-        from face_recognition import main as track_face
-
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", default=PORT)
-    parser.add_argument("--source", choices=("percipio", "webcam"), default="percipio",
-                        help="Camera source (default: Percipio RGB)")
-    parser.add_argument("--camera", type=int, default=0, help="Webcam index with --source webcam")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--debug-timing", action="store_true",
-                        help="Print measured controller update intervals and Hz once per second")
-    args = parser.parse_args()
-
-    if args.dry_run:
-        track_face(on_face=FaceController(debug_timing=args.debug_timing).update, camera_index=args.camera, source=args.source)
-        return
-
-    import serial
-
-    port = args.port or find_pico_port()
-    with serial.Serial(port, BAUD_RATE, timeout=1, write_timeout=1) as pico:
-        print(f"Sending servo angles to {port}. Press Q in the camera window to stop.")
-        controller = FaceController(pico, debug_timing=args.debug_timing)
-        pico.write(f"{controller.angle_x:.2f},{controller.angle_y:.2f}\n".encode("ascii"))
-        track_face(on_face=controller.update, camera_index=args.camera, source=args.source)
-
-
-if __name__ == "__main__":
-    main()
-
+        return self.angle_x, self.angle_y
