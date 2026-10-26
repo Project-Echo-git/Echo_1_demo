@@ -62,7 +62,6 @@ class TargetController:
         self._timing_intervals = []
 
     def _report_timing(self):
-        # Independent clock/state: includes target-loss calls, never clamps dt.
         now = time.perf_counter()
         if self._timing_previous is None:
             self._timing_previous = self._timing_started = now
@@ -96,15 +95,12 @@ class TargetController:
         dt = clamp(dt, 0.001, 0.1)
         self.previous_time = now
 
-        # Head-mounted camera: image error requests angular velocity (deg/s).
-        # Integrate from the current angle; centred targets hold that angle.
         speed_x = DIRECTION_X * self.pid_x.update(error_x, dt)
         speed_y = DIRECTION_Y * self.pid_y.update(error_y, dt)
         next_x = self.angle_x + speed_x * dt
         next_y = self.angle_y + speed_y * dt
         self.angle_x = clamp(next_x, *ANGLE_LIMITS_X)
         self.angle_y = clamp(next_y, *ANGLE_LIMITS_Y)
-        # Avoid integral windup when either servo reaches its travel limit.
         if self.angle_x != next_x:
             self.pid_x.integral = 0.0
         if self.angle_y != next_y:
@@ -115,4 +111,4 @@ class TargetController:
             self.pico.send_angles(self.angle_x, self.angle_y)
         else:
             print(f"error=({error_x}, {error_y}) px -> angles={command.strip()}")
-
+        return self.angle_x, self.angle_y

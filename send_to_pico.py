@@ -48,10 +48,7 @@ class Pico:
         self.close()
 
 
-PICOS = {
-    "left_arm": Pico("left_pico", pins=(28, 19)),
-}
-
-
 def send_angles(part, *angles):
+    from classes import PICOS
+
     PICOS[part].send_angles(*angles)

@@ -6,11 +6,12 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 import launch
-import person_tracker as tracking
-from controller import TargetController
-from face_detector import FaceDetector
-from person_detection import PersonDetector
-from send_to_pico import Pico, PICOS, send_angles
+import classes as tracking
+from center_pixel_PID import TargetController
+from face_tracker import FaceTracker
+from person_tracker import PersonTracker
+from send_to_pico import Pico, send_angles
+from classes import PICOS
 from face_tracker import StableTarget
 
 
@@ -30,7 +31,7 @@ class TargetTests(unittest.TestCase):
     def test_controller_limits_and_target_loss(self):
         pico = Mock()
         controller = TargetController(pico)
-        with patch("controller.time.monotonic", side_effect=[i * 0.033 for i in range(400)]):
+        with patch("center_pixel_PID.time.monotonic", side_effect=[i * 0.033 for i in range(400)]):
             for error in (10000, -10000):
                 for _ in range(200):
                     controller.update(error, error)
@@ -47,12 +48,12 @@ class TargetTests(unittest.TestCase):
 
 
 class DetectorTests(unittest.TestCase):
-    def test_face_detector_on_blank_image(self):
-        boxes = FaceDetector().detect(np.zeros((240, 320, 3), dtype=np.uint8))
+    def test_face_tracker_on_blank_image(self):
+        boxes = FaceTracker().detect(np.zeros((240, 320, 3), dtype=np.uint8))
         self.assertEqual(len(boxes), 0)
 
     def test_person_boxes_and_filter(self):
-        detector = PersonDetector.__new__(PersonDetector)
+        detector = PersonTracker.__new__(PersonTracker)
         detector.model = Mock()
         xyxy = Mock()
         xyxy.cpu.return_value.numpy.return_value = np.array([
@@ -84,6 +85,9 @@ class TrackingTests(unittest.TestCase):
                 detector = Mock(name=name)
                 detector.name, detector.target_point = name, aim
                 detector.detect.side_effect = [[(300, 180, 80, 200)]] * 4 + [[]]
+                detector.target = StableTarget(*aim)
+                cls = FaceTracker if name == "face" else PersonTracker
+                detector.update = lambda frame: cls.update(detector, frame)
                 stack.enter_context(patch.object(tracking, "open_camera", return_value=camera))
                 stack.enter_context(patch("face_tracker.time.monotonic", side_effect=[0, .05, .1, .2, .25]))
                 cleanup = self.gui(stack, [-1] * 4 + [ord("q")])
@@ -102,6 +106,9 @@ class TrackingTests(unittest.TestCase):
                 detector = Mock()
                 detector.name, detector.target_point = "face", (0.47, 0.3)
                 detector.detect.return_value = []
+                detector.target_point = (0.47, 0.3)
+                detector.target = StableTarget(*detector.target_point)
+                detector.update = lambda frame: FaceTracker.update(detector, frame)
                 callback = Mock()
                 if failure == "read":
                     camera.read.return_value = (False, None)
@@ -136,11 +143,11 @@ class ConnectionAndLaunchTests(unittest.TestCase):
             serial.return_value.close.assert_called_once()
 
     def test_preview_routes_detector_without_opening_serial(self):
-        for name, module, cls in (("face", "face_detector", "FaceDetector"),
-                                  ("person", "person_detection", "PersonDetector")):
+        for name, module, cls in (("face", "face_tracker", "FaceTracker"),
+                                  ("person", "person_tracker", "PersonTracker")):
             with self.subTest(detector=name), patch(f"{module}.{cls}") as detector, \
-                    patch.object(PICOS["left_arm"], "open") as pico, \
-                    patch("person_tracker.run_tracking") as loop:
+                    patch.object(PICOS["neck"], "open") as pico, \
+                    patch("classes.run_tracking") as loop:
                 args = launch.parse_args(["--detector", name, "--source", "webcam",
                                           "--camera", "2", "--dry-run"])
                 launch.run(args)
@@ -151,8 +158,8 @@ class ConnectionAndLaunchTests(unittest.TestCase):
                 self.assertIsNone(loop.call_args.kwargs["on_target"].__self__.pico)
 
     def test_launcher_closes_serial_when_tracking_fails(self):
-        with patch("face_detector.FaceDetector"), patch("serial.Serial") as serial, \
-                patch("person_tracker.run_tracking", side_effect=RuntimeError("camera failed")):
+        with patch("face_tracker.FaceTracker"), patch("serial.Serial") as serial, \
+                patch("classes.run_tracking", side_effect=RuntimeError("camera failed")):
             with self.assertRaisesRegex(RuntimeError, "camera failed"):
                 launch.run(launch.parse_args(["--port", "COM4"]))
             serial.return_value.write.assert_called_once_with(b"90.00,90.00\n")
@@ -161,4 +168,7 @@ class ConnectionAndLaunchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
 

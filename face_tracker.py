@@ -1,6 +1,36 @@
-"""Confirm and smooth targets before steering the moving camera."""
 import math
 import time
+import cv2
+
+
+class FaceTracker:
+    name = "face"
+    target_point = (0.47, 0.3)
+
+    def __init__(self):
+        self.target = StableTarget(*self.target_point)
+        self.model = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+        if self.model.empty():
+            raise RuntimeError("Could not load the OpenCV face detector.")
+
+    def detect(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return self.model.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=8, minSize=(50, 50)
+        )
+
+    def update(self, frame):
+        self.boxes = self.detect(frame)
+        self.point = self.target.update(self.boxes)
+        self.box = self.target.box
+        if self.point is None:
+            return None, None
+        height, width = frame.shape[:2]
+        x, y = map(round, self.point)
+        return x - width // 2, height // 2 - y
+
 
 class StableTarget:
     def __init__(self, point_x=0.47, point_y=0.3):
@@ -36,7 +66,6 @@ class StableTarget:
         elif boxes:
             selected = max(boxes, key=lambda box: box[2] * box[3])
         if selected is None:
-            # No stale steering commands; briefly retain the confirmed identity.
             if not self.confirmed:
                 self.reset()
             self.point = None

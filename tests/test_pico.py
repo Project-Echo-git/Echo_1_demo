@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from send_to_pico import Pico, PICOS, send_angles
+from send_to_pico import Pico, send_angles
+from classes import PICOS
 
 
 class PicoTests(unittest.TestCase):
