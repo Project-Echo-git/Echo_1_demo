@@ -1,12 +1,14 @@
-"""Confirm and smooth face targets before steering the moving camera."""
+"""Confirm and smooth targets before steering the moving camera."""
 import math
 import time
 
-class StableFaceTarget:
-    POINT_X = 0.47
-    POINT_Y = 0.3
+class StableTarget:
+    def __init__(self, point_x=0.47, point_y=0.3):
+        self.point_x = point_x
+        self.point_y = point_y
+        self.reset()
 
-    def __init__(self):
+    def reset(self):
         self.box = None
         self.count = 0
         self.confirmed = False
@@ -14,16 +16,16 @@ class StableFaceTarget:
         self.last_seen = None
         self.started = None
 
-    def update(self, faces, now=None):
+    def update(self, boxes, now=None):
         now = time.monotonic() if now is None else now
-        faces = [tuple(map(float, face)) for face in faces]
+        boxes = [tuple(map(float, box)) for box in boxes]
         if self.last_seen is not None and now - self.last_seen > 0.5:
-            self.__init__()
+            self.reset()
         selected = None
         if self.box is not None:
             x, y, w, h = self.box
             matches = []
-            for candidate in faces:
+            for candidate in boxes:
                 cx, cy, cw, ch = candidate
                 distance = math.hypot(cx + cw / 2 - x - w / 2, cy + ch / 2 - y - h / 2)
                 if (0.65 <= cw / w <= 1.55 and 0.65 <= ch / h <= 1.55
@@ -31,12 +33,12 @@ class StableFaceTarget:
                     matches.append((distance, candidate))
             if matches:
                 selected = min(matches, key=lambda item: item[0])[1]
-        elif faces:
-            selected = max(faces, key=lambda box: box[2] * box[3])
+        elif boxes:
+            selected = max(boxes, key=lambda box: box[2] * box[3])
         if selected is None:
             # No stale steering commands; briefly retain the confirmed identity.
             if not self.confirmed:
-                self.__init__()
+                self.reset()
             self.point = None
             return None
         dt = 0 if self.last_seen is None else now - self.last_seen
@@ -49,7 +51,7 @@ class StableFaceTarget:
         if not self.confirmed:
             return None
         x, y, w, h = selected
-        point = (x + w * self.POINT_X, y + h * self.POINT_Y)
+        point = (x + w * self.point_x, y + h * self.point_y)
         if self.point is not None:
             alpha = 1 - math.exp(-max(dt, 0) / 0.08)
             point = tuple(old + alpha * (new - old) for old, new in zip(self.point, point))
