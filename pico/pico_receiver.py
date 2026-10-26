@@ -1,4 +1,3 @@
-# Run this as code.py on the CircuitPython Pico.
 import sys
 import time
 import supervisor
