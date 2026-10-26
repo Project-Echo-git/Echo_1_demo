@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "process",
+      "problemMatcher": [],
+      "args": [
+        "-S",
+        "${workspaceFolder}",
+        "-B",
+        "${workspaceFolder}\\build",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64"
+      ],
+      "label": "Configure Percipio RGB",
+      "command": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe"
+    },
+    {
+      "command": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
+      "args": [
+        "--build",
+        "${workspaceFolder}\\build",
+        "--config",
+        "Release",
+        "--target",
+        "percipio_test"
+      ],
+      "group": {
+        "isDefault": true,
+        "kind": "build"
+      },
+      "label": "Build Percipio RGB",
+      "problemMatcher": "$msCompile",
+      "type": "process",
+      "dependsOn": "Configure Percipio RGB"
+    }
+  ]
+}

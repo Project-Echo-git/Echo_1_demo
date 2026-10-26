@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "request": "launch",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "name": "Percipio face tracking + Pico",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "type": "debugpy",
+      "args": [
+        "--source",
+        "percipio"
+      ],
+      "program": "${workspaceFolder}/launch.py"
+    },
+    {
+      "request": "launch",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "name": "Percipio face tracking (preview only)",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "type": "debugpy",
+      "args": [
+        "--source",
+        "percipio",
+        "--dry-run"
+      ],
+      "program": "${workspaceFolder}/launch.py"
+    },
+    {
+      "request": "launch",
+      "preLaunchTask": "Build Percipio RGB",
+      "name": "Run Percipio RGB",
+      "console": "integratedTerminal",
+      "type": "cppvsdbg",
+      "cwd": "${workspaceFolder}\\build\\Release",
+      "program": "${workspaceFolder}\\build\\Release\\percipio_test.exe",
+      "stopAtEntry": false
+    }
+  ]
+}
