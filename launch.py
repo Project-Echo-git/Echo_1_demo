@@ -21,7 +21,7 @@ def main():
 
     try:
         from Communicate_pico import main as run_tracking
-        run_tracking(track_face=track_target)
+        run_tracking()
         return 0
     except KeyboardInterrupt:
         return 130
