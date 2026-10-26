@@ -5,20 +5,18 @@ PORT = None
 BAUD_RATE = 115200
 START_ANGLE_X = 90.0
 START_ANGLE_Y = 90.0
-ANGLE_LIMITS_X = (60.0, 120.0)
-ANGLE_LIMITS_Y = (60.0, 120.0)
-# Increasing the angle must turn the camera toward a positive image error.
-# Reverse the corresponding sign if an axis moves away from the face.
-DIRECTION_X = 1
+ANGLE_LIMITS_X = (45.0, 150.0)
+ANGLE_LIMITS_Y = (45.0, 150.0)
+
+
+DIRECTION_X = -1
 DIRECTION_Y = 1
 DEAD_ZONE_PX = 3
-MAX_SPEED = 80.0
+MAX_SPEED = 90.0
 
-
-# (Kp, Ki, Kd): start with proportional control; tune on the actual head.
-# Output is degrees/second, input is face offset in pixels.
-PID_X = (0.2, 0.0, 0)
-PID_Y = (0.2, 0.0, 0)
+D_ALPHA = 0.25
+PID_X = (0.27, 0.0, 0.145)
+PID_Y = (0.27, 0.0, 0.145)
 
 
 def clamp(value, low, high):
@@ -33,17 +31,19 @@ class PID:
     def reset(self):
         self.integral = 0.0
         self.previous_error = None
+        self.d_filtered = 0.0
 
     def update(self, error, dt):
         if abs(error) <= DEAD_ZONE_PX:
             self.reset()
             return 0.0
 
-        derivative = 0.0
+        raw_derivative = 0.0
         if self.previous_error is not None:
-            derivative = (error - self.previous_error) / dt
+            raw_derivative = (error - self.previous_error) / dt
+        self.d_filtered += D_ALPHA * (raw_derivative - self.d_filtered)
         integral = clamp(self.integral + error * dt, -500.0, 500.0)
-        raw_speed = self.kp * error + self.ki * integral + self.kd * derivative
+        raw_speed = self.kp * error + self.ki * integral + self.kd * self.d_filtered
         speed = clamp(raw_speed, -MAX_SPEED, MAX_SPEED)
         if speed == raw_speed or error * raw_speed < 0:
             self.integral = integral
@@ -52,15 +52,39 @@ class PID:
 
 
 class FaceController:
-    def __init__(self, pico=None):
+    def __init__(self, pico=None, debug_timing=False):
         self.pico = pico
         self.pid_x = PID(*PID_X)
         self.pid_y = PID(*PID_Y)
         self.angle_x = START_ANGLE_X
         self.angle_y = START_ANGLE_Y
         self.previous_time = None
+        self.debug_timing = debug_timing
+        self._timing_previous = None
+        self._timing_started = None
+        self._timing_intervals = []
+
+    def _report_timing(self):
+        # Independent clock/state: includes target-loss calls, never clamps dt.
+        now = time.perf_counter()
+        if self._timing_previous is None:
+            self._timing_previous = self._timing_started = now
+            return
+        self._timing_intervals.append(now - self._timing_previous)
+        self._timing_previous = now
+        if now - self._timing_started >= 1.0:
+            intervals = self._timing_intervals
+            average = sum(intervals) / len(intervals)
+            rate = 1.0 / average if average > 0 else 0.0
+            print(f"[timing] update interval: avg={average * 1000:.1f} ms "
+                  f"min={min(intervals) * 1000:.1f} ms "
+                  f"max={max(intervals) * 1000:.1f} ms | {rate:.1f} Hz")
+            self._timing_intervals = []
+            self._timing_started = now
 
     def update(self, error_x, error_y, frame_width, frame_height):
+        if self.debug_timing:
+            self._report_timing()
         if error_x is None or error_y is None:
             self.pid_x.reset()
             self.pid_y.reset()
@@ -105,8 +129,9 @@ def find_pico_port():
     return candidates[0]
 
 
-def main():
-    from face_recognition import main as track_face
+def main(track_face=None):
+    if track_face is None:
+        from face_recognition import main as track_face
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=PORT)
@@ -114,10 +139,12 @@ def main():
                         help="Camera source (default: Percipio RGB)")
     parser.add_argument("--camera", type=int, default=0, help="Webcam index with --source webcam")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--debug-timing", action="store_true",
+                        help="Print measured controller update intervals and Hz once per second")
     args = parser.parse_args()
 
     if args.dry_run:
-        track_face(on_face=FaceController().update, camera_index=args.camera, source=args.source)
+        track_face(on_face=FaceController(debug_timing=args.debug_timing).update, camera_index=args.camera, source=args.source)
         return
 
     import serial
@@ -125,7 +152,7 @@ def main():
     port = args.port or find_pico_port()
     with serial.Serial(port, BAUD_RATE, timeout=1, write_timeout=1) as pico:
         print(f"Sending servo angles to {port}. Press Q in the camera window to stop.")
-        controller = FaceController(pico)
+        controller = FaceController(pico, debug_timing=args.debug_timing)
         pico.write(f"{controller.angle_x:.2f},{controller.angle_y:.2f}\n".encode("ascii"))
         track_face(on_face=controller.update, camera_index=args.camera, source=args.source)
 

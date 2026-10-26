@@ -1,0 +1,19 @@
+{
+  "settings_version": "0.0.8",
+  "datasets_dir": "C:\\Users\\wolfl\\OneDrive - Delft University of Technology\\Desktop\\datasets",
+  "weights_dir": "C:\\Users\\wolfl\\OneDrive - Delft University of Technology\\Desktop\\face tracker\\weights",
+  "runs_dir": "C:\\Users\\wolfl\\OneDrive - Delft University of Technology\\Desktop\\face tracker\\runs",
+  "uuid": "7af21608e609b2d18f1d5f83ffa8ed3c654be9422f11e5c11adc7d9b6a592dfe",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "mlflow": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}
