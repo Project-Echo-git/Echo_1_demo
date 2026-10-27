@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent
-MODEL_PATH = PROJECT_DIR / "models" / "yolo26n.pt"
+MODEL_PATH = PROJECT_DIR / "models" / "yolo26s.pt"
 CONFIDENCE = 0.5
 DETECTION_FRAMES = 40
 MIN_DETECTIONS = 25

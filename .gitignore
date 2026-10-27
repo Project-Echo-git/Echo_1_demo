@@ -5,3 +5,6 @@ __pycache__/
 /build/
 /deps/opencv/
 .yolo/
+/deps/ollama/
+/models/ollama/
+
