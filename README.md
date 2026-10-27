@@ -12,42 +12,6 @@ The robot's capabilities are built from separate modules. Start by choosing a sk
 | Nod yes | `robot.nod_yes()` | Moves the neck's pitch servo through a nod. |
 | Shake no | `robot.shake_no()` | Moves the neck's yaw servo from side to side. |
 
-
-```python
-from classes import Robot
-
-robot = Robot(source="percipio", port="COM4")
-robot.track_face()
-```
-
-Face and person tracking run until Q or Escape is pressed or the preview window is closed. Object recognition finishes when an object is confirmed, or after a 20-second timeout. Camera skills release the camera and close their serial connection on exit.
-
-Object recognition keeps checking the latest 40 frames and requires at least 25 sightings of an object. Each object gets one vote per frame. The most frequent qualifying name is printed once as `the detected object is: cup` and returned. If nothing is confirmed, it keeps looking and only prints `the detected object is: none` after 20 seconds. The timeout starts after the first detection finishes, excluding model startup. Q, Escape, or closing the preview cancels without printing `none`. Set `DETECTION_FRAMES`, `MIN_DETECTIONS`, and `DETECTION_TIMEOUT` in `object_detection.py` to adjust this.
-
-The selected name can also be passed to another function:
-
-```python
-robot.detect_objects(on_objects=print)
-```
-
-The callback receives one confirmed name when recognition finishes. To get raw per-frame detections, call the model directly:
-
-```python
-from object_detection import ObjectDetector
-from percipio_rgb import PercipioCamera
-
-model = ObjectDetector()
-camera = PercipioCamera()
-try:
-    ok, frame = camera.read()
-    if ok:
-        names = model.detect(frame)
-finally:
-    camera.release()
-```
-
-The arm and hand definitions are retained as configuration work in progress. They are not connected to configured Picos. `wave_left()` and the IK solver raise `NotImplementedError` until their hardware and calculations are supplied.
-
 ## Run the robot chat
 
 Run this from the project folder:
@@ -78,26 +42,6 @@ Simple numeric comparisons are calculated directly. Other questions use Llama, s
 | `/exit` | Closes the chat. `exit` and `quit` also work. |
 
 Skills run sequentially. While tracking is active, press Q or Escape in the camera window, or close that window, to return to the chat or continue the next skill. The chat does not accept another prompt while a skill is running. Timed tracking, simultaneous skills, and decisions based on future sensor results are not supported.
-
-### Run one prompt or skill
-
-A quoted prompt runs once and then exits:
-
-```powershell
-python launch.py "nod twice then shake your head"
-```
-
-Exact skill names bypass Llama and do not require Ollama:
-
-```powershell
-python launch.py track_face
-python launch.py track_person
-python launch.py detect_objects
-python launch.py nod_yes
-python launch.py shake_no
-```
-
-`python launch.py --help` shows the launcher arguments. Use `/skills` in the chat to list skills. Set camera and Pico configuration in `classes.py`; the launcher uses `Robot()` with those defaults.
 
 ## Local model setup
 
@@ -216,11 +160,4 @@ with PICOS["neck"]:
 
 To add another Pico, add its part name, Pico name, port, and ordered pins in `classes.py`. Adjust that Pico's standalone receiver to use the same pins and servo count. The sender already supports different numbers of angles.
 
-## Checks
-
-```text
-python -m unittest discover -s tests
-```
-
-The tests use simulated cameras and serial connections. They do not verify physical camera capture or servo movement.
 
